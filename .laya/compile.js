@@ -8,18 +8,14 @@ function useOtherNode(){
 }
 //获取Node插件和工作路径
 let ideModuleDir = useOtherNode() ? process.argv[1].replace("gulp\\bin\\gulp.js", "").replace("gulp/bin/gulp.js", "") : "";
-let workSpaceDir = useOtherNode() ? process.argv[2].replace("--gulpfile=", "").replace("\\.laya\\compile.js", "").replace("/.laya/compile.js", "") + "/" : "./../";
+let workSpaceDir = useOtherNode() ? process.argv[2].replace("--gulpfile=", "").replace("\\.laya\\compile.js", "").replace("/.laya/compile.js", "") : "./../";
 
-//引用插件模块
 const gulp = require(ideModuleDir + "gulp");
 const rollup = require(ideModuleDir + "rollup");
 const typescript = require(ideModuleDir + 'rollup-plugin-typescript2');//typescript2 plugin
 const glsl = require(ideModuleDir + 'rollup-plugin-glsl');
-let cp = require("child_process");
 const path = require('path');
 const fs = require('fs');
-
-let forceCompile = false;
 
 // 如果是发布时调用编译功能，增加prevTasks
 let prevTasks = "";
@@ -27,36 +23,18 @@ if (global.publish) {
 	prevTasks = ["loadConfig"];
 }
 
-//编译as为js，并输出为.laya/temp.js
-gulp.task('layacompile', prevTasks, function (cb) {
+gulp.task("compile", prevTasks, function () {
 	// 发布时调用编译功能，判断是否点击了编译选项
     if (global.publish) {
         workSpaceDir = global.workSpaceDir; // 发布时调用编译，workSpaceDir使用publish.js里的变量
-        forceCompile = !fs.existsSync(path.join(workSpaceDir, "bin", "js", "bundle.js")); // 发布时，并且没有编译过，则强制编译
+        let forceCompile = !fs.existsSync(path.join(workSpaceDir, "bin", "js", "bundle.js")); // 发布时，并且没有编译过，则强制编译
         if (!global.config.compile && !forceCompile) {
-            return cb();
+            return;
         }
     }
-	cp.exec(`"${workSpaceDir}.laya/layajs" "${workSpaceDir}asconfig.json;iflash=false;chromerun=false;quickcompile=true;out=.laya/temp.js;subpath=;script=ES6;outlaya=true;layaists=true"`,
-		function (error, stdout, stderr) {
-			// console.log(`\n[Info]\n${stdout}`);
-			if (error !== null) {
-				throw `${error}`;
-			} else {
-				if (stderr) console.log(`\n[Warning]\n${stderr}`);
-				cb();
-			}
-		}
-	)
-});
 
-gulp.task('compile', ["layacompile"], function (cb) {
-	// 发布时调用编译功能，判断是否点击了编译选项
-    if (global.publish && !global.config.compile && !forceCompile) {
-        return cb();
-    }
 	return rollup.rollup({
-		input: workSpaceDir + '/.laya/temp.js',
+		input: workSpaceDir + '/src/Main.ts',
 		onwarn:(waring,warn)=>{
 			if(waring.code == "CIRCULAR_DEPENDENCY"){
 				console.log("warnning Circular dependency:");
@@ -65,6 +43,12 @@ gulp.task('compile', ["layacompile"], function (cb) {
 		},
 		treeshake: false, //建议忽略
 		plugins: [
+			typescript({
+				tsconfig:workSpaceDir + "/tsconfig.json",
+				check: true, //Set to false to avoid doing any diagnostic checks on the code
+				tsconfigOverride:{compilerOptions:{removeComments: true}},
+				include:/.*.ts/,
+			}),
 			glsl({
 				// By default, everything gets included
 				include: /.*(.glsl|.vs|.fs)$/,
@@ -82,7 +66,7 @@ gulp.task('compile', ["layacompile"], function (cb) {
 		return bundle.write({
 			file: workSpaceDir + '/bin/js/bundle.js',
 			format: 'iife',
-			name: 'Laya',
+			name: 'laya',
 			sourcemap: false
 		});
 	}).catch(err=>{

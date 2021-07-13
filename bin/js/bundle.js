@@ -166,8 +166,7 @@
     }
 
     class GameConfig {
-        constructor() {
-        }
+        constructor() { }
         static init() {
             var reg = Laya.ClassUtils.regClass;
             reg("script/GameUI.ts", GameUI);
@@ -1334,6 +1333,7 @@
         onConfigLoaded() {
             Laya.stage.addChild(fgui.GRoot.inst.displayObject);
             new DemoEntry();
+            console.log('111');
         }
     }
     new Main();
